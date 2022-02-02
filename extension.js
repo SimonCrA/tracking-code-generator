@@ -32,15 +32,26 @@ function activate(context) {
         if (TYPE_SELECTED === "controller") {
           codeType = await vscode.window.showQuickPick(["err", "res"]);
         }
+        if (
+          TYPE_SELECTED == undefined ||
+          FILE_TYPE_SELECTED == undefined ||
+          codeType == undefined
+        ) {
+          vscode.window.showErrorMessage("Proceso de generacion de tracking-code cancelado.");
+          return false;
+        }
         //Code generated
         code = generateCode(TYPE_SELECTED, FILE_TYPE_SELECTED, codeType);
-      } else {
+      } else if (MODE === "custom") {
         const MODE = await vscode.window.showInputBox({
           title: "Tracking Code Generator",
           prompt: "introduzca el código en mayúscula y usando sólo letras.",
           placeHolder: "ejm. MVOPEE",
         });
         code = MODE;
+      } else {
+        vscode.window.showErrorMessage("Proceso de generacion de tracking-code cancelado.");
+        return false;
       }
 
       // console.log(CODE);

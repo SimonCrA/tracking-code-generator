@@ -2,6 +2,10 @@
 
 All notable changes to the "tcg" extension will be documented in this file.
 
+## [0.0.3]
+
+- Added error handling when aborting the creation of the tracking-code
+
 ## [0.0.2]
 
 - Added option to select a custom code or the deaults code
