@@ -14,50 +14,71 @@ function activate(context) {
       let newFile = "";
       let counter = 0;
       let finalTrackingCode = "";
-
+      let code = "";
       // Pickers to select the type of code to generate
-      const TYPE_SELECTED = await vscode.window.showQuickPick([
-        "validate",
-        "controller",
-        "service",
-      ]);
-      const FILE_TYPE_SELECTED = await vscode.window.showQuickPick([
-        "auth",
-        "operation",
-        "profile",
-        "list",
-      ]);
-      if (TYPE_SELECTED === "controller") {
-        codeType = await vscode.window.showQuickPick(["err", "res"]);
+      const MODE = await vscode.window.showQuickPick(["default", "custom"]);
+      if (MODE === "default") {
+        const TYPE_SELECTED = await vscode.window.showQuickPick([
+          "validate",
+          "controller",
+          "service",
+        ]);
+        const FILE_TYPE_SELECTED = await vscode.window.showQuickPick([
+          "auth",
+          "operation",
+          "profile",
+          "list",
+        ]);
+        if (TYPE_SELECTED === "controller") {
+          codeType = await vscode.window.showQuickPick(["err", "res"]);
+        }
+        //Code generated
+        code = generateCode(TYPE_SELECTED, FILE_TYPE_SELECTED, codeType);
+      } else {
+        const MODE = await vscode.window.showInputBox({
+          title: "Tracking Code Generator",
+          prompt: "introduzca el código en mayúscula y usando sólo letras.",
+          placeHolder: "ejm. MVOPEE",
+        });
+        code = MODE;
       }
-      //Code generated
-      const CODE = generateCode(TYPE_SELECTED, FILE_TYPE_SELECTED, codeType);
 
       // console.log(CODE);
       let lineSplitted = [];
       fs.readFileSync(CURRENT_FILE_PATH, "utf-8")
         .split(/\n/)
         .forEach((currentLine) => {
-          const EXIST_TRACKING_CODE_LINE = currentLine.includes("new ErrorUtilClass");
+          const EXIST_TRACKING_CODE_LINE =
+            codeType == "res"
+              ? currentLine.includes("CC_RESPONSE.core().send(")
+              : currentLine.includes("new ErrorUtilClass");
 
           if (EXIST_TRACKING_CODE_LINE) {
             counter++;
             if (counter > 999) {
-              finalTrackingCode = `${CODE}${counter}`;
+              finalTrackingCode = `${code}${counter}`;
             } else if (counter > 99) {
-              finalTrackingCode = `${CODE}${counter}`;
+              finalTrackingCode = `${code}${counter}`;
             } else if (counter > 9) {
-              finalTrackingCode = `${CODE}0${counter}`;
+              finalTrackingCode = `${code}0${counter}`;
             } else {
-              finalTrackingCode = `${CODE}00${counter}`;
+              finalTrackingCode = `${code}00${counter}`;
             }
             // console.log("Tracking-code ", finalTrackingCode);
             lineSplitted = currentLine.split("'");
-            lineSplitted.forEach((phrase, index) =>
-              index === 1
-                ? (lineSplitted[index] = `${finalTrackingCode}`)
-                : (lineSplitted[index] = phrase)
-            );
+            if (codeType == "res") {
+              lineSplitted.forEach((phrase, index) =>
+                index === 3
+                  ? (lineSplitted[index] = `${finalTrackingCode}`)
+                  : (lineSplitted[index] = phrase)
+              );
+            } else {
+              lineSplitted.forEach((phrase, index) =>
+                index === 1
+                  ? (lineSplitted[index] = `${finalTrackingCode}`)
+                  : (lineSplitted[index] = phrase)
+              );
+            }
 
             newFile += lineSplitted.join("'") + "\n";
           } else {
@@ -68,7 +89,7 @@ function activate(context) {
       //we save the new file with new tracking-codes
       fs.writeFile(CURRENT_FILE_PATH, newFile, "utf8", function (_err) {
         if (_err) return console.log(_err);
-        vscode.window.setStatusBarMessage(
+        vscode.window.showInformationMessage(
           "Los tracking-code del archivo han sido actualizados exitosamente."
         );
       });
