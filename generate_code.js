@@ -1,51 +1,85 @@
+const vscode = require("vscode");
+
 /**
  * Funcion para generar un tracking code dependiendo del archivo y tipo.
- * @param {String} _type_selected - tipo de logica
- * @param {String} _file_type_selected Tipo de archivo
- * @param {String} _code_type Tipo de codigo, error o respuesta
  * @returns tracking code generado
  */
 
-let generateCode = (_type_selected, _file_type_selected, _code_type) => {
+let generateCode = async () => {
+  let codeType = "";
+  let typeSelected = "";
+  let fileTypeSelected = "";
   let code = "";
-  switch (_type_selected) {
-    case "validate":
-      code += "MV";
-      break;
-    case "controller":
-      code += "C";
-      break;
-    case "service":
-      code += "S";
-      break;
-  }
-  switch (_file_type_selected) {
-    case "auth":
-      code += "AUT";
-      break;
-    case "operation":
-      code += "OPE";
-      break;
-    case "profile":
-      code += "PRO";
-      break;
-    case "list":
-      code += "LIS";
-      break;
-  }
 
-  if (_type_selected === "controller") {
-    switch (_code_type) {
-      case "err":
-        code += "E";
+  // Pickers to select the type of code to generate
+  const MODE = await vscode.window.showQuickPick(["default", "custom"]);
+
+  if (MODE === "default") {
+    typeSelected = await vscode.window.showQuickPick(["validate", "controller", "service"]);
+    fileTypeSelected = await vscode.window.showQuickPick(["auth", "operation", "profile", "list"]);
+
+    if (typeSelected === "controller") {
+      codeType = await vscode.window.showQuickPick(["err", "res"]);
+    }
+
+    if (typeSelected == undefined || fileTypeSelected == undefined || codeType == undefined) {
+      return null;
+    }
+
+    switch (typeSelected) {
+      case "validate":
+        code += "MV";
         break;
-      case "res":
+      case "controller":
+        code += "C";
+        break;
+      case "service":
         code += "S";
         break;
     }
+
+    switch (fileTypeSelected) {
+      case "auth":
+        code += "AUT";
+        break;
+      case "operation":
+        code += "OPE";
+        break;
+      case "profile":
+        code += "PRO";
+        break;
+      case "list":
+        code += "LIS";
+        break;
+    }
+
+    if (typeSelected === "controller") {
+      switch (codeType) {
+        case "err":
+          code += "E";
+          break;
+        case "res":
+          code += "S";
+          break;
+      }
+    } else {
+      code += "E";
+    }
+  } else if (MODE === "custom") {
+    const MODE = await vscode.window.showInputBox({
+      title: "Tracking Code Generator",
+      prompt: "introduzca el código en mayúscula usando sólo letras.",
+      placeHolder: "ejm. MVOPEE",
+    });
+
+    if (MODE == undefined || "") {
+      return null;
+    }
+    code = MODE;
   } else {
-    code += "E";
+    return null;
   }
+
   return code;
 };
 

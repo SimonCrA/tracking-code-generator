@@ -1,99 +1,58 @@
 // The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = require("vscode");
 const fs = require("fs");
 const generateCode = require("./generate_code");
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+const analyzeCode = require("./analyze_code");
+const rewriteLine = require("./rewrite_line");
+
+let processAborted = () => {
+  vscode.window.showErrorMessage("Proceso de generacion de tracking-code cancelado.");
+  return false;
+};
 
 function activate(context) {
   try {
     let disposable = vscode.commands.registerCommand("tcg.generateCode", async function () {
       const CURRENT_FILE_PATH = vscode.window.activeTextEditor.document.fileName;
-      let codeType = "";
       let newFile = "";
-      let counter = 0;
-      let finalTrackingCode = "";
       let code = "";
-      // Pickers to select the type of code to generate
-      const MODE = await vscode.window.showQuickPick(["default", "custom"]);
-      if (MODE === "default") {
-        const TYPE_SELECTED = await vscode.window.showQuickPick([
-          "validate",
-          "controller",
-          "service",
-        ]);
-        const FILE_TYPE_SELECTED = await vscode.window.showQuickPick([
-          "auth",
-          "operation",
-          "profile",
-          "list",
-        ]);
-        if (TYPE_SELECTED === "controller") {
-          codeType = await vscode.window.showQuickPick(["err", "res"]);
-        }
-        if (
-          TYPE_SELECTED == undefined ||
-          FILE_TYPE_SELECTED == undefined ||
-          codeType == undefined
-        ) {
-          vscode.window.showErrorMessage("Proceso de generacion de tracking-code cancelado.");
-          return false;
-        }
-        //Code generated
-        code = generateCode(TYPE_SELECTED, FILE_TYPE_SELECTED, codeType);
-      } else if (MODE === "custom") {
-        const MODE = await vscode.window.showInputBox({
-          title: "Tracking Code Generator",
-          prompt: "introduzca el código en mayúscula y usando sólo letras.",
-          placeHolder: "ejm. MVOPEE",
-        });
-        code = MODE;
-      } else {
-        vscode.window.showErrorMessage("Proceso de generacion de tracking-code cancelado.");
-        return false;
+
+      const ACTION = await vscode.window.showQuickPick(["analyze", "rewrite"]);
+
+      switch (ACTION) {
+        case "analyze":
+          const ANALYZER_CODE = await analyzeCode(CURRENT_FILE_PATH);
+          if (!ANALYZER_CODE) return processAborted();
+
+          //Code analized
+          code = ANALYZER_CODE;
+          break;
+        case "rewrite":
+          //Code generated
+          code = await generateCode();
+          if (!code) return processAborted();
+          break;
+
+        case undefined:
+          return processAborted();
       }
 
-      // console.log(CODE);
-      let lineSplitted = [];
+      //counter will start differently depending on if we want to analize the file or rewrite the current codes.
+      let counter = ACTION == "analyze" ? parseInt(code.split(" ")[1]) : 0;
+
+      //going through the file line by line
       fs.readFileSync(CURRENT_FILE_PATH, "utf-8")
         .split(/\n/)
         .forEach((currentLine) => {
-          const EXIST_TRACKING_CODE_LINE =
-            codeType == "res"
-              ? currentLine.includes("CC_RESPONSE.core().send(")
-              : currentLine.includes("new ErrorUtilClass");
-
-          if (EXIST_TRACKING_CODE_LINE) {
-            counter++;
-            if (counter > 999) {
-              finalTrackingCode = `${code}${counter}`;
-            } else if (counter > 99) {
-              finalTrackingCode = `${code}${counter}`;
-            } else if (counter > 9) {
-              finalTrackingCode = `${code}0${counter}`;
-            } else {
-              finalTrackingCode = `${code}00${counter}`;
-            }
-            // console.log("Tracking-code ", finalTrackingCode);
-            lineSplitted = currentLine.split("'");
-            if (codeType == "res") {
-              lineSplitted.forEach((phrase, index) =>
-                index === 3
-                  ? (lineSplitted[index] = `${finalTrackingCode}`)
-                  : (lineSplitted[index] = phrase)
-              );
-            } else {
-              lineSplitted.forEach((phrase, index) =>
-                index === 1
-                  ? (lineSplitted[index] = `${finalTrackingCode}`)
-                  : (lineSplitted[index] = phrase)
-              );
-            }
-
-            newFile += lineSplitted.join("'") + "\n";
+          if (ACTION == "analyze") {
+            const CODE = code.split(" ")[0];
+            const RES_LINE = rewriteLine(currentLine, CODE, counter);
+            counter = RES_LINE.counter;
+            newFile += RES_LINE.line;
           } else {
-            newFile += currentLine + "\n";
+            const RES_LINE = rewriteLine(currentLine, code, counter);
+            counter = RES_LINE.counter;
+            newFile += RES_LINE.line;
           }
         });
 
@@ -109,6 +68,7 @@ function activate(context) {
     context.subscriptions.push(disposable);
   } catch (_error) {
     console.log(_error);
+    vscode.window.showErrorMessage(_error.message);
   }
 }
 // this method is called when your extension is deactivated
